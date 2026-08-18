@@ -1141,7 +1141,21 @@ async function launchWorkspace(query){
  const intent=parseIntent(query);
  let mission=buildMission(intent);
 
- // Initial rendering of workspace
+ // Fetch Live OpenRouter / Groq AI synthesis with a fast fallback
+ try {
+   const llmPromise = fetchLLMResearch(query, intent);
+   const timeoutPromise = new Promise(res => setTimeout(() => res(null), 2500));
+   const llmData = await Promise.race([llmPromise, timeoutPromise]);
+   if (llmData && llmData.candidates && llmData.candidates.length > 0) {
+     mission.candidates = llmData.candidates;
+     if (llmData.reasoning) mission.reasoning = llmData.reasoning;
+     mission.verification = generateVerification(mission.candidates, mission.sources);
+   }
+ } catch(err) {
+   console.warn("LLM fetch notice:", err);
+ }
+
+ // Render workspace DOM ONCE
  const main=document.getElementById('ws-main');
  if(main){
   main.innerHTML=
@@ -1160,33 +1174,8 @@ async function launchWorkspace(query){
  }
  bindWorkspaceButtons(query);
 
- // Start agent animation
+ // Run agent animation continuously without DOM interruption
  runMission(mission);
-
- // Fetch Live OpenRouter AI LLM synthesis
- const llmData = await fetchLLMResearch(query, intent);
- if (llmData && llmData.candidates && llmData.candidates.length > 0) {
-   mission.candidates = llmData.candidates;
-   if (llmData.reasoning) mission.reasoning = llmData.reasoning;
-   mission.verification = generateVerification(mission.candidates, mission.sources);
-
-   if(main){
-    main.innerHTML=
-     renderUnderstanding(intent)+
-     renderPlan(mission.plan)+
-     renderWebActivity(mission.searchQueries)+
-     renderSources(mission.sources)+
-     renderDataTable(mission.candidates)+
-     renderComparison(mission.candidates)+
-     renderVerification(mission.verification)+
-     renderReasoning(mission.reasoning)+
-     renderMetrics(mission.metrics)+
-     renderResults(mission.candidates)+
-     renderActivityLog()+
-     renderFollowup();
-   }
-   bindWorkspaceButtons(query);
- }
 }
 
 function bindWorkspaceButtons(origQuery){
