@@ -18,3 +18,5 @@ src/engine/
 src/components/
 src/styles/
 src/main.js
+
+.vercel

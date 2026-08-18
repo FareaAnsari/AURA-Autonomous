@@ -1,6 +1,56 @@
 // ═══════════════════════════════════════════════════════════════════
-// AURA — Complete Application Logic
+// AURA — Complete Application Logic with Supabase Database
 // ═══════════════════════════════════════════════════════════════════
+
+// ── SUPABASE DATABASE INTEGRATION ─────────────────────────────────
+const SUPABASE_URL = 'https://ektvwnuodldzkrznqgxz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_q-W9_aU_Rb9QT0LVT0vFJA_QRJ4Kqmi';
+
+let supabaseClient = null;
+function getSupabase() {
+  if (!supabaseClient && window.supabase) {
+    try {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('⚡ Supabase DB initialized:', SUPABASE_URL);
+    } catch(e) {
+      console.warn('Supabase init warning:', e);
+    }
+  }
+  return supabaseClient;
+}
+
+async function saveMissionToSupabase(mission) {
+  const db = getSupabase();
+  if (!db) return null;
+  try {
+    const payload = {
+      query: mission.intent.raw,
+      category: mission.intent.category,
+      category_label: mission.intent.categoryLabel,
+      budget_display: mission.intent.budget ? mission.intent.budget.display : null,
+      location: mission.intent.location || null,
+      purpose: mission.intent.purpose || null,
+      intent_data: mission.intent,
+      plan_data: mission.plan,
+      candidates: mission.candidates,
+      sources: mission.sources,
+      verification: mission.verification,
+      reasoning: mission.reasoning,
+      metrics: mission.metrics,
+      status: 'COMPLETED'
+    };
+    const { data, error } = await db.from('research_missions').insert([payload]).select();
+    if (error) {
+      console.warn('Supabase save note (run supabase_schema.sql if table is missing):', error.message);
+      return null;
+    }
+    console.log('✅ Mission persisted to Supabase DB:', data);
+    return data;
+  } catch(err) {
+    console.warn('Supabase save error:', err);
+    return null;
+  }
+}
 
 // ── INTENT ENGINE ─────────────────────────────────────────────────
 const CATEGORY_RULES=[
@@ -916,6 +966,7 @@ async function runMission(mission){
  const dot=document.getElementById('ws-dot');if(dot){dot.style.background='#10b981';dot.style.animation='none';}
  const t=document.getElementById('ws-status-text');if(t)t.textContent='✅ Mission Complete';
  setOrb('complete');
+ saveMissionToSupabase(mission);
 }
 
 // ── APP CONTROLLER ────────────────────────────────────────────────
