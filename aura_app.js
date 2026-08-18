@@ -760,7 +760,84 @@ function renderWebActivity(queries){
 </div>`;
 }
 
-function renderSources(sources){
+function getSourceUrl(name, query) {
+  const n = (name || '').toLowerCase();
+  const q = encodeURIComponent(query || '');
+  if (n.includes('google')) return `https://www.google.com/search?q=${q}`;
+  if (n.includes('wikipedia')) return `https://en.wikipedia.org/wiki/Special:Search?search=${q}`;
+  if (n.includes('reddit')) return `https://www.reddit.com/search/?q=${q}`;
+  if (n.includes('quora')) return `https://www.quora.com/search?q=${q}`;
+  if (n.includes('medium')) return `https://medium.com/search?q=${q}`;
+  if (n.includes('youtube')) return `https://www.youtube.com/results?search_query=${q}`;
+  if (n.includes('amazon')) return `https://www.amazon.in/s?k=${q}`;
+  if (n.includes('flipkart')) return `https://www.flipkart.com/search?q=${q}`;
+  if (n.includes('coursera')) return `https://www.coursera.org/search?query=${q}`;
+  if (n.includes('udemy')) return `https://www.udemy.com/courses/search/?q=${q}`;
+  if (n.includes('gsmarena')) return `https://www.gsmarena.com/res.php3?sSearch=${q}`;
+  if (n.includes('github')) return `https://github.com/search?q=${q}`;
+  if (n.includes('tripadvisor')) return `https://www.tripadvisor.com/Search?q=${q}`;
+  if (n.includes('linkedin')) return `https://www.linkedin.com/search/results/all/?keywords=${q}`;
+  if (n.includes('aws')) return `https://aws.amazon.com/search/?searchQuery=${q}`;
+  if (n.includes('azure')) return `https://azure.microsoft.com/en-us/search/?q=${q}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(name + ' ' + (query || ''))}`;
+}
+
+function openSourceModal(safeName, icon, safeType, safeDesc, confidence, safeUrl, safeQuery) {
+  const name = decodeURIComponent(safeName);
+  const type = decodeURIComponent(safeType);
+  const desc = decodeURIComponent(safeDesc);
+  const url = decodeURIComponent(safeUrl);
+  const query = decodeURIComponent(safeQuery);
+
+  let modal = document.getElementById('source-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'source-modal';
+    modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;`;
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div style="background:#0d1527;border:1px solid rgba(0,212,255,.3);border-radius:20px;padding:32px;max-width:520px;width:100%;color:#f8fafc;box-shadow:0 25px 50px rgba(0,0,0,0.8);position:relative;">
+      <button onclick="document.getElementById('source-modal').style.display='none'" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,.1);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+      
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div style="font-size:32px;width:54px;height:54px;border-radius:14px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);display:flex;align-items:center;justify-content:center;">${icon}</div>
+        <div>
+          <h3 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:2px;">${name}</h3>
+          <div style="font-size:13px;color:#c084fc;font-weight:600;">${type} • Verified Autonomous Source</div>
+        </div>
+      </div>
+      
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Target Research Query</div>
+        <div style="font-size:14px;color:#fcd34d;font-family:'Consolas','JetBrains Mono',monospace;">"${query || 'Live Research Objective'}"</div>
+      </div>
+      
+      <div style="margin-bottom:20px;">
+        <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.6;margin-bottom:14px;">${desc}</div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;color:rgba(255,255,255,.5);">AURA Confidence Rating</span>
+          <span style="font-size:14px;font-weight:800;color:#10b981;">${confidence}% Verified</span>
+        </div>
+        <div class="confidence-bar" style="height:6px;border-radius:3px;background:rgba(255,255,255,.1);">
+          <div class="confidence-fill" style="width:${confidence}%;height:100%;background:linear-gradient(90deg,#00d4ff,#10b981);border-radius:3px;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <a href="${url}" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:12px 20px;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#a855f7);color:#fff;font-weight:700;font-size:14px;text-decoration:none;display:inline-block;box-shadow:0 4px 15px rgba(0,212,255,.3);" onclick="document.getElementById('source-modal').style.display='none'">Visit ${name} Live ↗</a>
+        <button onclick="document.getElementById('source-modal').style.display='none'" style="padding:12px 20px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;font-weight:600;font-size:14px;cursor:pointer;">Close</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function renderSources(sources, query){
+ const currentQuery = query || '';
  return`
 <div class="section-panel in-view" id="sources-section">
  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
@@ -768,16 +845,29 @@ function renderSources(sources){
   <div class="chip" style="margin-left:auto;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:#6ee7b7;">${sources.length} sources</div>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;" id="src-grid">
-  ${sources.map((s,i)=>`
-  <div class="source-card" id="sc-${i}">
+  ${sources.map((s,i)=>{
+   const url = getSourceUrl(s.name, currentQuery);
+   const safeUrl = encodeURIComponent(url);
+   const safeName = encodeURIComponent(s.name);
+   const safeDesc = encodeURIComponent(s.description);
+   const safeType = encodeURIComponent(s.type);
+   const safeQuery = encodeURIComponent(currentQuery);
+
+   return`
+  <div class="source-card" id="sc-${i}" style="cursor:pointer;" onclick="openSourceModal('${safeName}','${s.icon}','${safeType}','${safeDesc}','${s.confidence}','${safeUrl}','${safeQuery}')">
    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-    <div style="display:flex;align-items:center;gap:10px;"><div style="font-size:22px;">${s.icon}</div><div><div style="font-size:14px;font-weight:700;">${s.name}</div><div style="font-size:11px;color:rgba(255,255,255,.35);">${s.type}</div></div></div>
+    <div style="display:flex;align-items:center;gap:10px;"><div style="font-size:22px;">${s.icon}</div><div><div style="font-size:14px;font-weight:700;color:#f8fafc;">${s.name}</div><div style="font-size:11px;color:rgba(255,255,255,.35);">${s.type}</div></div></div>
     <div style="text-align:right;"><div style="font-size:11px;font-weight:700;color:#6ee7b7;">✓ VERIFIED</div><div style="font-size:10px;color:rgba(255,255,255,.3);">${s.timestamp}</div></div>
    </div>
-   <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px;line-height:1.5;">${s.description}</p>
+   <p style="font-size:12px;color:rgba(255,255,255,.55);margin-bottom:12px;line-height:1.5;">${s.description}</p>
    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:11px;color:rgba(255,255,255,.4);">Confidence</span><span style="font-size:12px;font-weight:700;color:#00d4ff;">${s.confidence}%</span></div>
-   <div class="confidence-bar"><div class="confidence-fill" style="width:${s.confidence}%;"></div></div>
-  </div>`).join('')}
+   <div class="confidence-bar" style="margin-bottom:12px;"><div class="confidence-fill" style="width:${s.confidence}%;"></div></div>
+   <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.06);padding-top:10px;margin-top:6px;">
+    <span style="font-size:11px;color:#00d4ff;font-weight:600;">Inspect Details →</span>
+    <a href="${url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="font-size:11px;color:#c084fc;text-decoration:none;padding:3px 10px;border-radius:6px;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);font-weight:600;" title="Visit ${s.name} Live">Visit Site ↗</a>
+   </div>
+  </div>`;
+  }).join('')}
  </div>
 </div>`;
 }
@@ -1251,7 +1341,7 @@ async function launchWorkspace(query){
    renderUnderstanding(intent)+
    renderPlan(mission.plan)+
    renderWebActivity(mission.searchQueries)+
-   renderSources(mission.sources)+
+   renderSources(mission.sources, query)+
    renderDataTable(mission.candidates)+
    renderComparison(mission.candidates)+
    renderVerification(mission.verification)+
