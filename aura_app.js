@@ -181,26 +181,85 @@ Provide 3 to 5 real, accurate, modern candidates with detailed specs. Return ONL
   }
 }
 
-// ── INTENT ENGINE ─────────────────────────────────────────────────
+// ── QUERY SANITIZER & INTENT ENGINE ─────────────────────────────────
+function cleanQuery(rawQuery) {
+  if (!rawQuery) return '';
+  let q = String(rawQuery).trim();
+  // Strip outer quotes: double, single, curly, backticks
+  q = q.replace(/^[ "'“”‘’`]+|[ "'“”‘’`]+$/g, '').trim();
+  // Standardize internal curly quotes
+  q = q.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  return q;
+}
+
 const CATEGORY_RULES=[
-  {category:'draft',       keywords:['draft','letter','application','email','cover letter','sop','statement of purpose','request letter','leave application','resume','proposal','write a letter','formal letter','permission letter'],icon:'📝',label:'Letter & Application Drafting'},
-  {category:'laptop',     keywords:['laptop','notebook','macbook','ultrabook','chromebook'],icon:'💻',label:'Laptop'},
-  {category:'smartphone', keywords:['phone','smartphone','mobile','iphone','android','oneplus','samsung phone','5g phone'],icon:'📱',label:'Smartphone'},
-  {category:'travel',     keywords:['trip','travel','tour','hotel','flight','vacation','visit','stay','destination','itinerary','places to'],icon:'✈️',label:'Travel'},
-  {category:'course',     keywords:['course','learn','tutorial','certification','training','study','bootcamp','degree'],icon:'🎓',label:'Course / Learning'},
-  {category:'cloud',      keywords:['cloud','aws','azure','gcp','hosting','server','vps','devops','deployment'],icon:'☁️',label:'Cloud Platform'},
-  {category:'comparison', keywords:['compare','vs','versus','difference between','which is better'],icon:'⚖️',label:'Comparison'},
-  {category:'career',     keywords:['career','job','resume','skills for','salary','interview','hire'],icon:'💼',label:'Career'},
+  {category:'draft',       keywords:['draft','letter','application','email','cover letter','sop','statement of purpose','request letter','leave application','resume','cv','proposal','write a letter','formal letter','permission letter','write an email','compose'],icon:'📝',label:'Letter & Application Drafting'},
+  {category:'laptop',     keywords:['laptop','notebook','macbook','ultrabook','chromebook','computer for','pc for'],icon:'💻',label:'Laptop'},
+  {category:'smartphone', keywords:['phone','smartphone','mobile','iphone','android','oneplus','samsung phone','5g phone','camera phone','handset'],icon:'📱',label:'Smartphone'},
+  {category:'travel',     keywords:['trip','travel','tour','hotel','flight','vacation','visit','stay','destination','itinerary','places to','getaway'],icon:'✈️',label:'Travel'},
+  {category:'course',     keywords:['course','learn','tutorial','certification','training','study','bootcamp','degree','class','how to learn'],icon:'🎓',label:'Course / Learning'},
+  {category:'cloud',      keywords:['cloud','aws','azure','gcp','hosting','server','vps','devops','deployment','docker','kubernetes'],icon:'☁️',label:'Cloud Platform'},
+  {category:'comparison', keywords:['compare','vs','versus','difference between','which is better','or should i buy'],icon:'⚖️',label:'Comparison'},
+  {category:'career',     keywords:['career','job','resume','skills for','salary','interview','hire','roadmap for'],icon:'💼',label:'Career'},
   {category:'general',    keywords:[],icon:'🔍',label:'General Research'},
 ];
 
-function detectCategory(q){
-  const ql=q.toLowerCase();
-  for(const r of CATEGORY_RULES) if(r.keywords.some(k=>new RegExp(k).test(ql))) return r;
-  return CATEGORY_RULES[CATEGORY_RULES.length-1];
+function detectCategory(rawQ){
+  const q = cleanQuery(rawQ);
+  const ql = q.toLowerCase();
+
+  // Smart Intent Reasoning: detect document/email/letter drafting requests implicitly
+  if (
+    /draft|letter|application|email|cover letter|sop|statement of purpose|request letter|leave|resume|cv|proposal|write|compose|prepare an? (email|letter|application|document|request)|permission|leave of absence|sponsorship|notice|recommendation|resignation|apology/i.test(ql) ||
+    /(?:can you|please|help me) (?:write|draft|compose|prepare|make|create) (?:an?|a|my)? (?:email|letter|application|message|document|request)/i.test(ql) ||
+    /asking (?:my|for) (?:boss|manager|teacher|professor|hr|company|principal)/i.test(ql)
+  ) {
+    return CATEGORY_RULES[0]; // draft
+  }
+
+  // Laptop intent reasoning
+  if (/laptop|notebook|macbook|ultrabook|chromebook|computer for (coding|gaming|work|college)|pc for (programming|editing)/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'laptop');
+  }
+
+  // Smartphone intent reasoning
+  if (/phone|smartphone|mobile|iphone|android|oneplus|samsung|pixel|5g phone|camera phone|handset/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'smartphone');
+  }
+
+  // Travel intent reasoning
+  if (/trip|travel|tour|hotel|flight|vacation|visit|stay|destination|itinerary|places to|weekend getaway|resort|guide for/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'travel');
+  }
+
+  // Course intent reasoning
+  if (/course|learn|tutorial|certification|training|study|bootcamp|degree|class|how to learn|platform for/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'course');
+  }
+
+  // Cloud intent reasoning
+  if (/cloud|aws|azure|gcp|hosting|server|vps|devops|deployment|docker|kubernetes/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'cloud');
+  }
+
+  // Comparison intent reasoning
+  if (/compare| vs |versus|difference between|which is better|or should i buy/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'comparison');
+  }
+
+  // Career intent reasoning
+  if (/career|job|skills for|salary|interview|hire|roadmap for|how to become/i.test(ql)) {
+    return CATEGORY_RULES.find(r => r.category === 'career');
+  }
+
+  // Fallback to keyword matching
+  for(const r of CATEGORY_RULES) if(r.keywords.some(k=>new RegExp(k,'i').test(ql))) return r;
+
+  return CATEGORY_RULES[CATEGORY_RULES.length-1]; // general
 }
 
-function extractBudget(q){
+function extractBudget(rawQ){
+  const q = cleanQuery(rawQ);
   const patterns=[/(?:₹|rs\.?\s*)([0-9,]+)/i,/\$([0-9,]+)/i,/([0-9]+)k\b/i,/(?:under|below|within|upto|up to)\s*(?:₹|rs\.?\s*|\$)?([0-9,]+)/i,/([0-9]{4,})/];
   for(const p of patterns){
     const m=q.match(p);
@@ -210,21 +269,22 @@ function extractBudget(q){
 }
 
 const CITIES=['mumbai','delhi','bangalore','bengaluru','hyderabad','chennai','kolkata','pune','ahmedabad','jaipur','goa','dubai','singapore','london','paris','new york','tokyo','bali','manali','shimla','darjeeling','ooty','kerala','rajasthan','agra'];
-function extractLocation(q){const ql=q.toLowerCase();for(const c of CITIES)if(ql.includes(c))return c.replace(/\b\w/g,ch=>ch.toUpperCase());const m=q.match(/(?:in|to|at|near|around)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);return m?m[1]:null;}
-function extractDuration(q){const m=q.match(/(\d+)\s*(?:-\s*day|day|night|week|month)/i);return m?m[0]:null;}
+function extractLocation(rawQ){const q=cleanQuery(rawQ);const ql=q.toLowerCase();for(const c of CITIES)if(ql.includes(c))return c.replace(/\b\w/g,ch=>ch.toUpperCase());const m=q.match(/(?:in|to|at|near|around)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);return m?m[1]:null;}
+function extractDuration(rawQ){const q=cleanQuery(rawQ);const m=q.match(/(\d+)\s*(?:-\s*day|day|night|week|month)/i);return m?m[0]:null;}
 
 const PURPOSE_MAP={'Programming':['programming','coding','developer','code','software','python','machine learning','ml','ai','data science'],'Gaming':['gaming','game','esports'],'Business':['business','office','work','professional'],'Student':['student','college','university','school'],'Design':['design','graphic','video editing'],'Beginner':['beginner','starter','newbie','basics','introduction'],'Advanced':['advanced','expert','deep dive'],'Budget Travel':['budget','cheap','affordable','backpacker'],'Luxury Travel':['luxury','premium','5 star','resort']};
-function extractPurpose(q){const ql=q.toLowerCase();for(const[l,ks]of Object.entries(PURPOSE_MAP))if(ks.some(k=>ql.includes(k)))return l;return null;}
+function extractPurpose(rawQ){const q=cleanQuery(rawQ);const ql=q.toLowerCase();for(const[l,ks]of Object.entries(PURPOSE_MAP))if(ks.some(k=>ql.includes(k)))return l;return null;}
 
-function extractFeatures(q,cat){
-  const ql=q.toLowerCase(),f=[];
+function extractFeatures(rawQ,cat){
+  const q=cleanQuery(rawQ);const ql=q.toLowerCase(),f=[];
   if(cat==='laptop'||cat==='smartphone'){if(/amoled|oled/.test(ql))f.push('AMOLED/OLED Display');if(/5g/.test(ql))f.push('5G');if(/16gb/.test(ql))f.push('16GB RAM');if(/ssd/.test(ql))f.push('SSD');if(/ryzen|amd/.test(ql))f.push('AMD Processor');if(/battery/.test(ql))f.push('Long Battery');}
   if(cat==='travel'){if(/weekend/.test(ql))f.push('Weekend Trip');if(/solo/.test(ql))f.push('Solo Travel');if(/beach/.test(ql))f.push('Beach');}
   if(cat==='course'){if(/free/.test(ql))f.push('Free / Freemium');if(/certif/.test(ql))f.push('Certificate');}
   return f;
 }
 
-function extractSubjects(q){
+function extractSubjects(rawQ){
+  const q=cleanQuery(rawQ);
   const vsM=q.match(/([A-Za-z0-9+#.]+)\s+vs\.?\s+([A-Za-z0-9+#.]+)(?:\s+vs\.?\s+([A-Za-z0-9+#.]+))?/i);
   if(vsM)return[vsM[1],vsM[2],vsM[3]].filter(Boolean);
   const cM=q.match(/compare\s+(.+)/i);
@@ -232,9 +292,10 @@ function extractSubjects(q){
   return[];
 }
 
-function parseIntent(query){
-  const cr=detectCategory(query);
-  const budget=extractBudget(query),location=extractLocation(query),duration=extractDuration(query),purpose=extractPurpose(query),features=extractFeatures(query,cr.category),subjects=extractSubjects(query);
+function parseIntent(rawQuery){
+  const cleanQ = cleanQuery(rawQuery);
+  const cr=detectCategory(cleanQ);
+  const budget=extractBudget(cleanQ),location=extractLocation(cleanQ),duration=extractDuration(cleanQ),purpose=extractPurpose(cleanQ),features=extractFeatures(cleanQ,cr.category),subjects=extractSubjects(cleanQ);
   const requirements=[];
   if(budget)requirements.push({label:'Budget',value:budget.display,color:'cyan'});
   if(cr.category!=='general')requirements.push({label:'Category',value:cr.label,color:'purple'});
@@ -245,7 +306,7 @@ function parseIntent(query){
   features.forEach(f=>requirements.push({label:'Feature',value:f,color:'pink'}));
   requirements.push({label:'Results',value:'Top 5',color:'gray'});
   requirements.push({label:'Verification',value:'Required',color:'red'});
-  return{raw:query,category:cr.category,categoryLabel:cr.label,categoryIcon:cr.icon,budget,location,duration,purpose,features,subjects,requirements};
+  return{raw:cleanQ,category:cr.category,categoryLabel:cr.label,categoryIcon:cr.icon,budget,location,duration,purpose,features,subjects,requirements};
 }
 
 // ── MISSION GENERATOR ─────────────────────────────────────────────
@@ -1308,7 +1369,8 @@ function bindLandingButtons(){
  }
 }
 
-async function launchWorkspace(query){
+async function launchWorkspace(rawQuery){
+ const query = cleanQuery(rawQuery);
  // Hide landing sections
  ['landing','how','capabilities','about'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
  const ft=document.querySelector('footer');if(ft)ft.style.display='none';
