@@ -58,9 +58,70 @@ const getGroqKey = () => "gsk_" + "I8AoXLxL6ixqf2xhe50x" + "WGdyb3FY3q1cWKMpHJB5
 
 async function fetchLLMResearch(query, intent) {
   try {
-    const prompt = `You are AURA (Autonomous Unified Research Agent).
-Conduct thorough web research and synthesis for the user's research goal: "${query}".
-Category: ${intent.categoryLabel}. Budget: ${intent.budget ? intent.budget.display : 'Flexible'}.
+    const isDraft = intent.category === 'draft' || /draft|letter|application|email|cover letter|sop|statement of purpose|proposal|write/i.test(query);
+
+    let prompt = `You are AURA (Autonomous Unified Research Agent & Expert Document Writer).
+User Request: "${query}".
+Category: ${intent.categoryLabel}.
+
+`;
+
+    if (isDraft) {
+      prompt += `The user wants you to draft a formal letter, application, email, cover letter, SOP, or document.
+Generate complete, beautifully structured draft(s) with professional tone, proper salutations, body paragraphs, and closing, replacing placeholders with realistic text or bracketed fields.
+
+Return a JSON object strictly following this JSON format:
+{
+  "reasoning": "Detailed breakdown of the formal tone, structural etiquette, key points included, and guidelines for sending or customizing this document.",
+  "candidates": [
+    {
+      "name": "Standard Formal Draft",
+      "priceDisplay": "Ready to Use ✉️",
+      "badge": "Full Official Draft",
+      "rating": 4.9,
+      "specs": {
+        "Document Type": "Formal Application / Letter",
+        "Tone": "Professional & Polite",
+        "Format": "Standard Official Layout",
+        "Placeholders": "[Your Name], [Date], [Recipient]"
+      },
+      "pros": ["Includes all official formal sections", "Clear subject line & polite closing", "Ready for immediate copy & print"],
+      "cons": ["Fill in bracketed personal fields"],
+      "whySelected": "Complete official draft text crafted according to formal document standards.",
+      "fullText": "Full complete letter or application text with Subject line, Salutation, Body, and Sign-off...",
+      "scores": {
+        "Clarity": 98,
+        "Professionalism": 96,
+        "Completeness": 97
+      }
+    },
+    {
+      "name": "Concise Email Variant",
+      "priceDisplay": "Email Ready 📧",
+      "badge": "Modern & Direct",
+      "rating": 4.8,
+      "specs": {
+        "Document Type": "Short Email Application",
+        "Tone": "Direct & Efficient",
+        "Format": "Modern Email Body",
+        "Placeholders": "[Your Name]"
+      },
+      "pros": ["Optimized for fast reading", "Highlights key request upfront", "Ideal for email body"],
+      "cons": ["Shorter background context"],
+      "whySelected": "Concise alternative optimized for fast email communication.",
+      "fullText": "Full concise email draft text...",
+      "scores": {
+        "Clarity": 99,
+        "Professionalism": 94,
+        "Completeness": 93
+      }
+    }
+  ]
+}
+Return ONLY raw valid JSON.`;
+    } else {
+      prompt += `Conduct thorough web research and synthesis.
+Budget: ${intent.budget ? intent.budget.display : 'Flexible'}.
 
 Return a JSON object strictly following this JSON format:
 {
@@ -89,6 +150,7 @@ Return a JSON object strictly following this JSON format:
   ]
 }
 Provide 3 to 5 real, accurate, modern candidates with detailed specs. Return ONLY raw valid JSON.`;
+    }
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -121,6 +183,7 @@ Provide 3 to 5 real, accurate, modern candidates with detailed specs. Return ONL
 
 // ── INTENT ENGINE ─────────────────────────────────────────────────
 const CATEGORY_RULES=[
+  {category:'draft',       keywords:['draft','letter','application','email','cover letter','sop','statement of purpose','request letter','leave application','resume','proposal','write a letter','formal letter','permission letter'],icon:'📝',label:'Letter & Application Drafting'},
   {category:'laptop',     keywords:['laptop','notebook','macbook','ultrabook','chromebook'],icon:'💻',label:'Laptop'},
   {category:'smartphone', keywords:['phone','smartphone','mobile','iphone','android','oneplus','samsung phone','5g phone'],icon:'📱',label:'Smartphone'},
   {category:'travel',     keywords:['trip','travel','tour','hotel','flight','vacation','visit','stay','destination','itinerary','places to'],icon:'✈️',label:'Travel'},
@@ -834,17 +897,45 @@ function renderMetrics(metrics){
 
 function renderResults(candidates){
  const colors=['#00d4ff','#a855f7','#10b981','#f59e0b','#ef4444'];
+ const isDrafting = candidates.some(c => c.fullText);
+
  return`
 <div class="section-panel in-view" id="results-section">
  <div class="mission-complete animate-bounce-in" style="margin-bottom:28px;">
-  <div style="font-size:40px;margin-bottom:8px;">✅</div>
-  <h2 style="font-size:28px;font-weight:900;color:#10b981;margin-bottom:8px;">Mission Complete</h2>
-  <p style="font-size:15px;color:rgba(255,255,255,.6);max-width:540px;margin:0 auto;">I found <strong style="color:#00d4ff;">${candidates.length} results</strong> matching your requirements and verified the key specifications across multiple sources.</p>
+  <div style="font-size:40px;margin-bottom:8px;">${isDrafting ? '📝' : '✅'}</div>
+  <h2 style="font-size:28px;font-weight:900;color:${isDrafting ? '#00d4ff' : '#10b981'};margin-bottom:8px;">${isDrafting ? 'Document Drafted Successfully' : 'Mission Complete'}</h2>
+  <p style="font-size:15px;color:rgba(255,255,255,.6);max-width:540px;margin:0 auto;">${isDrafting ? 'AURA generated official letter/application draft(s) tailored to your request. You can copy or download the draft below.' : `I found <strong style="color:#00d4ff;">${candidates.length} results</strong> matching your requirements and verified the key specifications across multiple sources.`}</p>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;">
   ${candidates.map((c,i)=>{
    const color=colors[i%colors.length];
    const avg=Math.round(Object.values(c.scores).reduce((a,b)=>a+b,0)/Object.values(c.scores).length);
+
+   if (c.fullText) {
+     const safeText = encodeURIComponent(c.fullText);
+     return `
+   <div class="result-card" style="grid-column:1 / -1; border-color:${color}55; background:rgba(0,212,255,.03); padding:24px; border-radius:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+     <div>
+      <div style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:12px;font-weight:700;background:${color}22;color:${color};margin-bottom:6px;">${c.badge}</div>
+      <div style="font-size:20px;font-weight:800;color:#f8fafc;">${c.name}</div>
+     </div>
+     <div style="display:flex;gap:10px;">
+      <button class="btn-secondary" style="padding:10px 18px;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;" data-text="${safeText}" onclick="navigator.clipboard.writeText(decodeURIComponent(this.getAttribute('data-text')));alert('📋 Draft copied to clipboard!');">📋 Copy Draft</button>
+      <button class="btn-primary" style="padding:10px 18px;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;" data-text="${safeText}" onclick="const blob=new Blob([decodeURIComponent(this.getAttribute('data-text'))],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AURA_Drafted_Document.txt';a.click();">📥 Download .txt</button>
+     </div>
+    </div>
+    
+    <div style="background:#090d16;border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:24px;color:#f1f5f9;font-family:'Consolas','JetBrains Mono',monospace;font-size:14px;line-height:1.85;white-space:pre-wrap;margin-bottom:16px;box-shadow:inset 0 2px 10px rgba(0,0,0,0.5);">
+${c.fullText}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.6);flex-wrap:wrap;gap:8px;">
+     <div>${c.whySelected}</div>
+     <div style="display:flex;gap:12px;"><span style="color:#6ee7b7;">Clarity: ${c.scores?.Clarity || 98}%</span> <span style="color:#f59e0b;">★ ${c.rating}</span></div>
+    </div>
+   </div>`;
+   }
+
    return`
   <div class="result-card" style="${i===0?`border-color:${color}44;background:rgba(0,212,255,.04);`:''}">
    <div style="display:inline-block;padding:4px 14px;border-radius:999px;font-size:12px;font-weight:700;background:${color}22;color:${color};margin-bottom:12px;">${c.badge}</div>
@@ -869,8 +960,6 @@ function renderResults(candidates){
  </div>
  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;">
   <button class="btn-secondary" style="padding:10px 20px;font-size:13px;" onclick="document.getElementById('followup-input').focus()">🔄 Refine Results</button>
-  <button class="btn-secondary" style="padding:10px 20px;font-size:13px;" id="change-budget-btn">💰 Change Budget</button>
-  <button class="btn-secondary" style="padding:10px 20px;font-size:13px;" id="add-req-btn">➕ Add Requirement</button>
   <button class="btn-primary" style="padding:10px 24px;font-size:13px;" id="new-mission-bottom-btn">🚀 Start New Mission</button>
  </div>
 </div>`;
