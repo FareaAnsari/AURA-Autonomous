@@ -109,6 +109,68 @@ body{font-family:'Inter',sans-serif;background:#0a0f1e;color:#e2e8f0;overflow-x:
 .metric-label{font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
 .mission-complete{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(0,212,255,.08));border:1px solid rgba(16,185,129,.3);border-radius:20px;padding:32px;text-align:center;box-shadow:0 15px 40px rgba(16,185,129,.1)}
 .section-panel{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}.section-panel.in-view{opacity:1;transform:translateY(0)}
+
+/* 🌀 CYBER PORTAL OVERLAY ANIMATION STYLES */
+#aura-portal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  overflow: hidden;
+  background: radial-gradient(circle at center, rgba(10,15,30,0.92) 0%, rgba(5,8,16,0.98) 100%);
+  backdrop-filter: blur(15px);
+}
+#aura-portal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.portal-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px dashed rgba(0, 212, 255, 0.6);
+  box-shadow: 0 0 50px rgba(0, 212, 255, 0.4), inset 0 0 50px rgba(168, 85, 247, 0.4);
+  animation: vortexSpin 8s linear infinite;
+}
+.portal-core {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #00d4ff 0%, #a855f7 60%, transparent 100%);
+  box-shadow: 0 0 80px #00d4ff, 0 0 140px #a855f7;
+  animation: portalPulse 1.2s ease-in-out infinite alternate;
+}
+.portal-expand-ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 3px solid #00d4ff;
+  position: absolute;
+  opacity: 0;
+}
+#aura-portal-overlay.active .portal-expand-ring {
+  animation: portalWarpOut 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes vortexSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes portalPulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes portalWarpOut {
+  0% { opacity: 1; transform: scale(1); box-shadow: 0 0 20px #00d4ff; }
+  50% { opacity: 0.9; box-shadow: 0 0 100px #a855f7, 0 0 200px #00d4ff; }
+  100% { opacity: 0; transform: scale(120); box-shadow: 0 0 300px #00d4ff; }
+}
+
 @media(max-width:768px){.section{padding:48px 0}.container{padding:0 16px}.data-table{font-size:12px}.data-table td,.data-table th{padding:10px 8px}.result-card{padding:16px}.metric-value{font-size:28px}.score-label{width:80px}}
 </style>
 </head>

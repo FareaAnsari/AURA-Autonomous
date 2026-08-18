@@ -1369,8 +1369,138 @@ function bindLandingButtons(){
  }
 }
 
+function triggerPortalAnimation(){
+  let portal = document.getElementById('aura-portal-overlay');
+  if(!portal){
+    portal = document.createElement('div');
+    portal.id = 'aura-portal-overlay';
+    portal.innerHTML = `
+      <div class="portal-ring" style="width:280px;height:280px;"></div>
+      <div class="portal-ring" style="width:460px;height:460px;animation-duration:12s;animation-direction:reverse;border-color:rgba(168,85,247,0.5);"></div>
+      <div class="portal-core"></div>
+      <div class="portal-expand-ring"></div>
+      <div style="position:absolute;bottom:18%;font-size:15px;font-weight:800;letter-spacing:0.12em;color:#00d4ff;text-transform:uppercase;font-family:'JetBrains Mono',monospace;text-shadow:0 0 12px #00d4ff;">
+        ⚡ ENTERING AURA CYBER PORTAL...
+      </div>
+    `;
+    document.body.appendChild(portal);
+  }
+  portal.classList.add('active');
+  setTimeout(()=>{
+    portal.classList.remove('active');
+  }, 1100);
+}
+
+function initNetworkCanvas(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let width = (canvas.width = canvas.parentElement ? canvas.parentElement.offsetWidth : window.innerWidth);
+  let height = (canvas.height = canvas.parentElement ? canvas.parentElement.offsetHeight : 600);
+
+  window.addEventListener('resize', () => {
+    if (!canvas.parentElement) return;
+    width = canvas.width = canvas.parentElement.offsetWidth;
+    height = canvas.height = canvas.parentElement.offsetHeight;
+  });
+
+  const particles = [];
+  const particleCount = 75;
+  let mouse = { x: width / 2, y: height / 2 };
+
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+
+  for (let i = 0; i < particleCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 30 + Math.random() * (Math.min(width, height) * 0.42);
+    particles.push({
+      angle: angle,
+      radius: radius,
+      speed: 0.002 + Math.random() * 0.007,
+      size: 1 + Math.random() * 2.8,
+      color: Math.random() > 0.5 ? '#00d4ff' : '#a855f7',
+      alpha: 0.2 + Math.random() * 0.7
+    });
+  }
+
+  let rotation = 0;
+
+  function animate() {
+    ctx.clearRect(0, 0, width, height);
+    const cx = width / 2 + (mouse.x - width / 2) * 0.04;
+    const cy = height / 2 + (mouse.y - height / 2) * 0.04;
+
+    rotation += 0.0025;
+
+    // Outer Cyber Portal Rings
+    for (let r = 1; r <= 3; r++) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 95, 0, Math.PI * 2);
+      ctx.strokeStyle = r === 1 ? 'rgba(0, 212, 255, 0.15)' : r === 2 ? 'rgba(168, 85, 247, 0.1)' : 'rgba(59, 130, 246, 0.06)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([14, 18]);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(r % 2 === 0 ? rotation : -rotation);
+      ctx.translate(-cx, -cy);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Portal Particles & Dynamic Mesh
+    ctx.setLineDash([]);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.angle += p.speed;
+
+      const px = cx + Math.cos(p.angle) * p.radius;
+      const py = cy + Math.sin(p.angle) * p.radius;
+
+      ctx.beginPath();
+      ctx.arc(px, py, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = p.color;
+      ctx.fill();
+
+      // Connect nearby particles
+      for (let j = i + 1; j < particles.length; j++) {
+        const p2 = particles[j];
+        const p2x = cx + Math.cos(p2.angle) * p2.radius;
+        const p2y = cy + Math.sin(p2.angle) * p2.radius;
+        const dist = Math.hypot(px - p2x, py - p2y);
+
+        if (dist < 95) {
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(p2x, p2y);
+          ctx.strokeStyle = p.color;
+          ctx.globalAlpha = (1 - dist / 95) * 0.18;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+}
+
 async function launchWorkspace(rawQuery){
  const query = cleanQuery(rawQuery);
+
+ // Trigger Cyber Portal Transition Animation
+ triggerPortalAnimation();
+ await dly(450);
+
  // Hide landing sections
  ['landing','how','capabilities','about'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
  const ft=document.querySelector('footer');if(ft)ft.style.display='none';
